@@ -1,0 +1,33 @@
+define user express greeting
+  "Hello"
+  "Hi"
+  "Hey"
+  "Good morning"
+  "Good afternoon"
+
+define bot express greeting
+  "Hello! How can I help you today?"
+  "Hi there! What can I do for you?"
+
+define user ask about capabilities
+  "What can you do?"
+  "What are your capabilities?"
+  "How can you help me?"
+
+define bot respond about capabilities
+  "I can help you with various tasks like answering questions, providing information, and having conversations. How can I assist you today?"
+
+define flow self check input
+  $allowed = execute self_check_input
+  if not $allowed
+    bot refuse to respond
+    stop
+
+define flow self check output
+  $allowed = execute self_check_output
+  if not $allowed
+    bot refuse to respond
+    stop
+
+define bot refuse to respond
+  "I'm sorry, but I can't help with that request."

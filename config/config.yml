@@ -1,0 +1,36 @@
+models:
+  - type: main
+    engine: openai
+    model: Qwen/Qwen3-0.6B
+    parameters:
+      base_url: http://localhost:8000/v1
+      api_key: "not-needed"
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+
+instructions:
+  - type: general
+    content: |
+      Below is a conversation between a user and a helpful AI assistant.
+      The assistant is helpful, respectful, and honest.
+      The assistant should not generate harmful, unethical, or inappropriate content.
+      Do not use <think> tags. Respond directly without showing reasoning.
+
+sample_conversation: |
+  user "Hello!"
+    express greeting
+  bot express greeting
+    "Hello! How can I help you today?"
+  user "What can you do?"
+    ask about capabilities
+  bot respond about capabilities
+    "I can help you with various tasks like answering questions, providing information, and having conversations."
+
+rails:
+  input:
+    flows:
+      - self check input
+  output:
+    flows:
+      - self check output

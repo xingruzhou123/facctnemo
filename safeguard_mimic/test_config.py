@@ -158,7 +158,7 @@ def main():
         print("       - Access to the configured LLM endpoints")
 
         # Uncomment to run async tests (requires API keys)
-        # asyncio.run(test_guardrails_async(config))
+        asyncio.run(test_guardrails_async(config))
 
     print("\n" + "=" * 60)
     print("Test Complete")

@@ -12,15 +12,15 @@ import guardrails
 # AMD Sensitive Info Check (Input)
 flow check amd sensitive info input
   """Check if user input contains AMD sensitive technical information."""
-  $result = execute check_amd_regex(text=$user_message, check_type="input")
+  $result = call check_amd_regex(text=$user_message, check_type="input")
   if $result == True
     bot say "I'm sorry, I cannot discuss AMD micro-architecture details, branch predictors, or cache internals."
-    abort
+    abort 
 
 # Harmful Regex Check (Input)
 flow check harmful regex input
   """Check if user input contains harmful keywords."""
-  $result = execute check_harmful_regex(text=$user_message)
+  $result = call check_harmful_regex(text=$user_message)
   if $result == True
     bot say "I cannot assist with that request as it may involve harmful content."
     abort

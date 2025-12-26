@@ -219,7 +219,8 @@ async def classify_intent_regex(
     # Banking intents
     if re.search(r"(activate|activation).*card", text_lower):
         return "activate_my_card"
-    if re.search(r"(lost|stolen|missing).*card", text_lower):
+    # Change this line in classify_intent_regex:
+    if re.search(r"(lost|stolen|missing).*card|card.*(lost|stolen|missing)", text_lower):
         return "lost_or_stolen_card"
     if re.search(r"change.*(pin|password)", text_lower):
         return "change_pin"

@@ -27,21 +27,29 @@ models:
         chat_template_kwargs:
           enable_thinking: false
 
-
-  # Llama Guard for content safety checks
-  - type: llama_guard
     engine: openai
-    model: meta/llama-guard-3-1b
-    arameters:
-      base_url: http://localhost:8002/v1
+    model: Qwen/Qwen3-1.7B
+    parameters:
+      base_url: http://localhost:8000/v1
       api_key: "not-needed"
       extra_body:
         chat_template_kwargs:
           enable_thinking: false
-  # Alternative: Use NVIDIA's content safety model
-  # - type: content_safety
-  #   engine: nim
-  #   model: nvidia/llama-3.1-nemoguard-8b-content-safety
+
+
+  # Llama Guard for content safety checks
+  - type: llama_guard
+    engine: openai
+    engine: openai
+    model: meta/llama-guard-3-1b
+    parameters:
+      base_url: http://localhost:8002/v1
+      api_key: "not-needed"
+
+# Alternative: Use NVIDIA's content safety model
+# - type: content_safety
+#   engine: nim
+#   model: nvidia/llama-3.1-nemoguard-8b-content-safety
 
 # =============================================================================
 # Rails Configuration

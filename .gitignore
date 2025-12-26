@@ -12,3 +12,6 @@ wheels/
 # Logs
 logs/
 ref/
+
+# vscode
+.vscode/

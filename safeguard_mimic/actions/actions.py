@@ -52,22 +52,15 @@ EXTENDED_HARMFUL_PATTERN = re.compile(
 
 
 # =============================================================================
-# Action: Check AMD Regex
+# Action: Check AMD Regex (Names must end with "Action" in Colang 2.x)
 # =============================================================================
-@action(name="check_amd_regex")
-async def check_amd_regex(
+@action(name="CheckAmdRegexAction")
+async def check_amd_regex_action(
     text: str,
     check_type: str = "input"
 ) -> bool:
     """
     Check if text contains AMD sensitive technical information.
-
-    Args:
-        text: The text to check
-        check_type: "input" or "output"
-
-    Returns:
-        True if sensitive content detected (should block), False otherwise
     """
     if not text:
         return False
@@ -83,18 +76,12 @@ async def check_amd_regex(
 # =============================================================================
 # Action: Check Harmful Regex (Input)
 # =============================================================================
-@action(name="check_harmful_regex")
-async def check_harmful_regex(
+@action(name="CheckHarmfulRegexAction")
+async def check_harmful_regex_action(
     text: str
 ) -> bool:
     """
     Check if input text contains harmful keywords.
-
-    Args:
-        text: The user input text to check
-
-    Returns:
-        True if harmful content detected (should block), False otherwise
     """
     if not text:
         return False
@@ -117,18 +104,12 @@ async def check_harmful_regex(
 # =============================================================================
 # Action: Check Sensitive Regex (Output)
 # =============================================================================
-@action(name="check_sensitive_regex")
-async def check_sensitive_regex(
+@action(name="CheckSensitiveRegexAction")
+async def check_sensitive_regex_action(
     text: str
 ) -> bool:
     """
     Check if output text contains sensitive terms.
-
-    Args:
-        text: The bot output text to check
-
-    Returns:
-        True if sensitive content detected (should block), False otherwise
     """
     if not text:
         return False
@@ -142,84 +123,33 @@ async def check_sensitive_regex(
 
 
 # =============================================================================
-# Action: Combined Safety Check
+# Keep old names for backward compatibility with tests
 # =============================================================================
-@action(name="check_all_regex_patterns")
-async def check_all_regex_patterns(
-    text: str,
-    check_type: str = "input"
-) -> dict:
-    """
-    Run all regex pattern checks on the text.
-
-    Args:
-        text: The text to check
-        check_type: "input" or "output"
-
-    Returns:
-        Dictionary with check results
-    """
-    results = {
-        "amd_sensitive": False,
-        "harmful": False,
-        "sensitive": False,
-        "blocked": False,
-        "matched_patterns": []
-    }
-
-    if not text:
-        return results
-
-    # AMD check
-    if AMD_SENSITIVE_PATTERN.search(text):
-        results["amd_sensitive"] = True
-        results["matched_patterns"].append("amd_sensitive")
-
-    # Harmful check (primarily for input)
-    if check_type == "input":
-        if HARMFUL_INPUT_PATTERN.search(text) or EXTENDED_HARMFUL_PATTERN.search(text):
-            results["harmful"] = True
-            results["matched_patterns"].append("harmful")
-
-    # Sensitive check (primarily for output)
-    if check_type == "output":
-        if SENSITIVE_OUTPUT_PATTERN.search(text):
-            results["sensitive"] = True
-            results["matched_patterns"].append("sensitive")
-
-    # Set blocked flag if any check failed
-    results["blocked"] = any([
-        results["amd_sensitive"],
-        results["harmful"],
-        results["sensitive"]
-    ])
-
-    return results
+@action(name="check_amd_regex")
+async def check_amd_regex(text: str, check_type: str = "input") -> bool:
+    return await check_amd_regex_action(text, check_type)
 
 
-# =============================================================================
-# Action: Intent Classification Helper
-# =============================================================================
+@action(name="check_harmful_regex")
+async def check_harmful_regex(text: str) -> bool:
+    return await check_harmful_regex_action(text)
+
+
+@action(name="check_sensitive_regex")
+async def check_sensitive_regex(text: str) -> bool:
+    return await check_sensitive_regex_action(text)
+
+
 @action(name="classify_intent_regex")
-async def classify_intent_regex(
-    text: str
-) -> Optional[str]:
+async def classify_intent_regex(text: str) -> Optional[str]:
     """
     Simple regex-based intent classification for common patterns.
-    This supplements the LLM-based intent classification.
-
-    Args:
-        text: The user input text
-
-    Returns:
-        Intent name if matched, None otherwise
     """
     text_lower = text.lower()
 
     # Banking intents
     if re.search(r"(activate|activation).*card", text_lower):
         return "activate_my_card"
-    # Change this line in classify_intent_regex:
     if re.search(r"(lost|stolen|missing).*card|card.*(lost|stolen|missing)", text_lower):
         return "lost_or_stolen_card"
     if re.search(r"change.*(pin|password)", text_lower):

@@ -1,0 +1,13 @@
+# Ignore caches and bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore local tooling and OS noise
+.DS_Store
+*.log
+
+# Ignore docs and test helpers
+README.md
+test_config.py

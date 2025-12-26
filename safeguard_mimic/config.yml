@@ -1,0 +1,180 @@
+# NeMo Guardrails Configuration
+# Mimicking SafeGuard Rails Flow
+
+colang_version: "2.x"
+
+# =============================================================================
+# Models Configuration
+# =============================================================================
+models:
+  # Main LLM for generation
+  - type: main
+    engine: nim
+    model: meta/llama-3.3-70b-instruct
+
+  # Llama Guard for content safety checks
+  - type: llama_guard
+    engine: nim
+    model: meta/llama-guard-3-1b
+
+  # Alternative: Use NVIDIA's content safety model
+  # - type: content_safety
+  #   engine: nim
+  #   model: nvidia/llama-3.1-nemoguard-8b-content-safety
+
+# =============================================================================
+# Rails Configuration
+# =============================================================================
+rails:
+  input:
+    flows:
+      # 1. Regex-based sensitive info blocking (AMD protection)
+      - check amd sensitive info input
+      # 2. Regex-based harmful content blocking
+      - check harmful regex input
+      # 3. LLM-based hate speech detection
+      - content safety check input $model=llama_guard
+      # 4. Self-check for additional safety
+      - self check input
+
+  output:
+    flows:
+      # 1. Regex-based AMD info blocking
+      - check amd sensitive info output
+      # 2. Regex-based sensitive content blocking
+      - check sensitive regex output
+      # 3. LLM-based content safety check
+      - content safety check output $model=llama_guard
+      # 4. Fact checking (RAG faithfulness equivalent)
+      - self check facts
+
+  # Configuration for specific rails
+  config:
+    # Fact checking configuration
+    fact_checking:
+      parameters: {}
+      fallback_to_self_check: true
+
+# =============================================================================
+# User Messages (Intent Classification - Banking77 + Small Talk)
+# =============================================================================
+user_messages:
+  # Banking77 Intents
+  activate_my_card:
+    - "I need to activate my card, how is that done?"
+    - "My new card has arrived, what's the activation procedure?"
+
+  age_limit:
+    - "How old do I need to be?"
+    - "How old does my daughter have to be to open an account?"
+
+  apple_pay_or_google_pay:
+    - "I can't get google pay to work right."
+    - "Why is top up not working in Apple Pay?"
+
+  atm_support:
+    - "Can you tell me the ATMs I can use with my card?"
+    - "Where are the ATMs that accept this card?"
+
+  card_not_working:
+    - "My card is not working"
+    - "I can't use my card"
+
+  lost_or_stolen_card:
+    - "My card was lost. What do I do?"
+    - "I think my card has been stolen."
+
+  change_pin:
+    - "I would like to change my PIN"
+    - "How do I change my PIN?"
+
+  # Small Talk Intents
+  smalltalk_greetings_hello:
+    - "hello"
+    - "hi"
+    - "hey there"
+
+  smalltalk_greetings_bye:
+    - "goodbye"
+    - "bye"
+    - "talk to you later"
+
+  smalltalk_agent_chatbot:
+    - "are you a robot?"
+    - "are you a bot?"
+    - "are you a human being"
+
+  smalltalk_appraisal_thank_you:
+    - "thanks for the help"
+    - "thank you very much"
+
+  # Custom Intents
+  query_product_price:
+    - "How much is the robot arm?"
+    - "What is the price of a Ryzen 9 9950X CPU?"
+
+  check_order_status:
+    - "What is the status of my order 12345?"
+    - "Where is order #67890?"
+
+  control_robot_arm:
+    - "Move the robot arm to the left"
+    - "Grab the sphere"
+
+  check_flight_price:
+    - "How much is a flight from Austin to New York?"
+    - "What's the price for a ticket to San Francisco from Dallas?"
+
+  out_of_domain:
+    - "Introduce UT Austin"
+    - "What is deep-sea basket weaving?"
+
+# =============================================================================
+# Bot Messages
+# =============================================================================
+bot_messages:
+  blocked_sensitive_content:
+    - "I'm sorry, I cannot provide information about that topic."
+
+  blocked_harmful_content:
+    - "I cannot assist with that request as it may involve harmful content."
+
+  fallback_response:
+    - "I'm not sure this question is covered in the materials, but here's what I can tell you in general."
+
+# =============================================================================
+# Instructions
+# =============================================================================
+instructions:
+  - type: general
+    content: |
+      You are a helpful AI assistant for a banking and customer service application.
+      You should be helpful, harmless, and honest.
+      Do not provide information about AMD micro-architecture, branch predictors, or cache internals.
+      Do not assist with harmful, illegal, or unethical requests.
+      If you're unsure about something, say so rather than making up information.
+
+# =============================================================================
+# Knowledge Base Configuration
+# =============================================================================
+knowledge_base:
+  folder: kb
+  embedding_search_provider:
+    name: default
+    parameters:
+      embedding_engine: FastEmbed
+      embedding_model: all-MiniLM-L6-v2
+
+# =============================================================================
+# Custom Data (Regex Patterns)
+# =============================================================================
+custom_data:
+  regex_patterns:
+    # AMD sensitive information pattern
+    amd_sensitive: "(?i)(AMD|Ryzen|Zen\\s*\\d+).*(branch\\s*predict(or|ion)|cache|micro[- ]?arch|pipeline|BTB|PBT)"
+
+    # Harmful content keywords
+    harmful_input: "(?i)(bomb|grenade|explosive|weapon|kill|murder|arson|accelerant|meth|drug\\s*(recipe|synthesis)|dark\\s*web|hack|phishing|backdoor|voyeur|secretly\\s*(watch|record)|nude)"
+
+    # Sensitive output terms
+    sensitive_output: "(?i)\\b(voyeur|rape|incest|molest|bomb|grenade|arson|meth|hack|weapon)\\b"

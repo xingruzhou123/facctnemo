@@ -1,0 +1,104 @@
+# NeMo Guardrails Colang 2.x Flows
+# Mimicking SafeGuard Rails Flow
+
+import core
+import llm
+import guardrails
+
+# =============================================================================
+# Input Rails
+# =============================================================================
+
+# AMD Sensitive Info Check (Input)
+flow check amd sensitive info input
+  """Check if user input contains AMD sensitive technical information."""
+  $result = execute check_amd_regex(text=$user_message, check_type="input")
+  if $result == True
+    bot say "I'm sorry, I cannot discuss AMD micro-architecture details, branch predictors, or cache internals."
+    abort
+
+# Harmful Regex Check (Input)
+flow check harmful regex input
+  """Check if user input contains harmful keywords."""
+  $result = execute check_harmful_regex(text=$user_message)
+  if $result == True
+    bot say "I cannot assist with that request as it may involve harmful content."
+    abort
+
+# =============================================================================
+# Output Rails
+# =============================================================================
+
+# AMD Sensitive Info Check (Output)
+flow check amd sensitive info output
+  """Check if bot output contains AMD sensitive technical information."""
+  $result = execute check_amd_regex(text=$bot_message, check_type="output")
+  if $result == True
+    bot say "I apologize, but I cannot provide that information."
+    abort
+
+# Sensitive Regex Check (Output)
+flow check sensitive regex output
+  """Check if bot output contains sensitive terms."""
+  $result = execute check_sensitive_regex(text=$bot_message)
+  if $result == True
+    bot say "I apologize, I cannot provide a response with that content."
+    abort
+
+# =============================================================================
+# Intent Handling Flows
+# =============================================================================
+
+# Banking Intents
+flow user activate_my_card
+  """Handle card activation queries."""
+  user said "activate my card" or user said "card activation"
+  bot say "To activate your card, please log into your account and navigate to Card Services, or call our activation hotline."
+
+flow user lost_or_stolen_card
+  """Handle lost/stolen card reports."""
+  user said "lost my card" or user said "card stolen"
+  bot say "I'm sorry to hear that. Please immediately lock your card in the app and contact our support team to request a replacement."
+
+flow user change_pin
+  """Handle PIN change requests."""
+  user said "change my pin" or user said "change pin"
+  bot say "You can change your PIN through the mobile app under Settings > Card > Change PIN, or at any ATM using your current PIN."
+
+# Small Talk Flows
+flow user smalltalk_greetings_hello
+  """Handle greetings."""
+  user said "hello" or user said "hi" or user said "hey"
+  bot say "Hello! How can I help you today?"
+
+flow user smalltalk_greetings_bye
+  """Handle goodbyes."""
+  user said "bye" or user said "goodbye"
+  bot say "Goodbye! Have a great day!"
+
+flow user smalltalk_agent_chatbot
+  """Handle questions about bot identity."""
+  user said "are you a robot" or user said "are you a bot"
+  bot say "Yes, I'm an AI assistant designed to help you with banking and customer service queries."
+
+flow user smalltalk_appraisal_thank_you
+  """Handle thank you messages."""
+  user said "thank you" or user said "thanks"
+  bot say "You're welcome! Is there anything else I can help you with?"
+
+# Custom Intents
+flow user query_product_price
+  """Handle product price queries."""
+  user said "product price" or user said "how much"
+  bot say "I'd be happy to help you with pricing. Could you please specify which product you're interested in?"
+
+flow user check_order_status
+  """Handle order status queries."""
+  user said "order status" or user said "where is my order"
+  bot say "I can help you check your order status. Please provide your order number."
+
+# Fallback Flow
+flow fallback
+  """Handle out-of-domain queries."""
+  user said something unexpected
+  bot say "I'm not sure this question is covered in the materials, but I'll do my best to help. Could you please rephrase your question?"

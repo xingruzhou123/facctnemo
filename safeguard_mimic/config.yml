@@ -6,17 +6,38 @@ colang_version: "2.x"
 # =============================================================================
 # Models Configuration
 # =============================================================================
+# models:
+#   # Main LLM for generation
+#   - type: main
+#     engine: nim
+#     model: meta/llama-3.3-70b-instruct
+
+#   # Llama Guard for content safety checks
+#   - type: llama_guard
+#     engine: nim
+#     model: meta/llama-guard-3-1b
 models:
-  # Main LLM for generation
   - type: main
-    engine: nim
-    model: meta/llama-3.3-70b-instruct
+    engine: openai
+    model: Qwen/Qwen3-1.7B
+    parameters:
+      base_url: http://localhost:8000/v1
+      api_key: "not-needed"
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+
 
   # Llama Guard for content safety checks
   - type: llama_guard
-    engine: nim
+    engine: openai
     model: meta/llama-guard-3-1b
-
+    arameters:
+      base_url: http://localhost:8002/v1
+      api_key: "not-needed"
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
   # Alternative: Use NVIDIA's content safety model
   # - type: content_safety
   #   engine: nim

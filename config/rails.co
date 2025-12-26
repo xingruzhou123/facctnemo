@@ -1,9 +1,13 @@
 define user express greeting
   "Hello"
+  "Hello!"
   "Hi"
+  "Hi!"
   "Hey"
+  "Hey!"
   "Good morning"
   "Good afternoon"
+  "Good evening"
 
 define bot express greeting
   "Hello! How can I help you today?"
@@ -17,17 +21,37 @@ define user ask about capabilities
 define bot respond about capabilities
   "I can help you with various tasks like answering questions, providing information, and having conversations. How can I assist you today?"
 
-define flow self check input
-  $allowed = execute self_check_input
-  if not $allowed
-    bot refuse to respond
-    stop
+# Flows that connect user intents to bot responses
+define flow greeting
+  user express greeting
+  bot express greeting
 
-define flow self check output
-  $allowed = execute self_check_output
-  if not $allowed
-    bot refuse to respond
-    stop
+define flow capabilities
+  user ask about capabilities
+  bot respond about capabilities
+
+# Remove chatting flow - let general conversation handle it with LLM
 
 define bot refuse to respond
   "I'm sorry, but I can't help with that request."
+
+# Block harmful/dangerous requests
+define user ask harmful
+  "make a bomb"
+  "build a weapon"
+  "how to hurt someone"
+  "how to kill"
+  "illegal drugs"
+  "hack into"
+  "steal money"
+  "make explosives"
+
+define flow block harmful
+  user ask harmful
+  bot refuse to respond
+  stop
+
+# Fallback for general questions - let LLM respond
+define flow general conversation
+  user ...
+  bot ...

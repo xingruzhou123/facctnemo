@@ -1,7 +1,7 @@
 models:
   - type: main
     engine: openai
-    model: Qwen/Qwen3-0.6B
+    model: Qwen/Qwen3-1.7B
     parameters:
       base_url: http://localhost:8000/v1
       api_key: "not-needed"
@@ -27,10 +27,3 @@ sample_conversation: |
   bot respond about capabilities
     "I can help you with various tasks like answering questions, providing information, and having conversations."
 
-rails:
-  input:
-    flows:
-      - self check input
-  output:
-    flows:
-      - self check output

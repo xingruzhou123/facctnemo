@@ -26,9 +26,6 @@ models:
       extra_body:
         chat_template_kwargs:
           enable_thinking: false
-    generation:
-      actions: false
-      flows: false
 
   - type: llama_guard
     engine: openai
@@ -36,15 +33,28 @@ models:
     parameters:
       base_url: http://localhost:8002/v1
       api_key: "not-needed"
+
+# =============================================================================
+# Rails Configuration (matching SafeGuard)
+# =============================================================================
 rails:
   input:
     flows:
+      # 1. AMD tech info protection (regex)
       - check amd sensitive info input
+      # 2. Harmful content regex
       - check harmful regex input
+      # 3. Llama Guard semantic safety check (LLM-based)
+      - llama guard check input
+
   output:
     flows:
+      # 1. AMD output protection (regex)
       - check amd sensitive info output
+      # 2. Sensitive content regex
       - check sensitive regex output
+      # 3. Llama Guard semantic safety check (LLM-based)
+      - llama guard check output
 
 # =============================================================================
 # Instructions
@@ -59,26 +69,15 @@ instructions:
       If you're unsure about something, say so rather than making up information.
 
 # =============================================================================
-# Knowledge Base Configuration
-# =============================================================================
-# knowledge_base:
-#   folder: kb
-#   embedding_search_provider:
-#     name: default
-#     parameters:
-#       embedding_engine: FastEmbed
-#       embedding_model: all-MiniLM-L6-v2
-
-# =============================================================================
-# Custom Data (Regex Patterns)
+# Custom Data (Regex Patterns - matching SafeGuard)
 # =============================================================================
 custom_data:
   regex_patterns:
-    # AMD sensitive information pattern
+    # AMD sensitive information pattern (from SafeGuard)
     amd_sensitive: "(?i)(AMD|Ryzen|Zen\\s*\\d+).*(branch\\s*predict(or|ion)|cache|micro[- ]?arch|pipeline|BTB|PBT)"
 
-    # Harmful content keywords
-    harmful_input: "(?i)(bomb|grenade|explosive|weapon|kill|murder|arson|accelerant|meth|drug\\s*(recipe|synthesis)|dark\\s*web|hack|phishing|backdoor|voyeur|secretly\\s*(watch|record)|nude)"
+    # Harmful content keywords (from SafeGuard input_harmful_regex)
+    harmful_input: "(?i)(bomb|grenade|explosive|weapon|kill|murder|arson|accelerant|meth|drug\\s*(recipe|synthesis)|dark\\s*web|hack|phishing|backdoor|voyeur|secretly\\s*(watch|record)|nude|slit\\s*eyes|ballet\\s*dancers\\s*gay|gay\\s*couples|transgender|caitlyn\\s*jenner|pizzagate)"
 
-    # Sensitive output terms
+    # Sensitive output terms (from SafeGuard output_sensitive_regex)
     sensitive_output: "(?i)\\b(voyeur|rape|incest|molest|bomb|grenade|arson|meth|hack|weapon)\\b"

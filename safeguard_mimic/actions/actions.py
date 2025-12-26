@@ -140,6 +140,244 @@ async def check_sensitive_regex(text: str) -> bool:
     return await check_sensitive_regex_action(text)
 
 
+# =============================================================================
+# Llama Guard Check Actions (matching SafeGuard llama_guard_fast)
+# =============================================================================
+
+# LlamaGuard endpoint configuration
+LLAMA_GUARD_BASE_URL = "http://localhost:8002/v1"
+LLAMA_GUARD_MODEL = "meta-llama/Llama-Guard-3-1B"
+
+
+@action(name="call_llama_guard_input")
+async def call_llama_guard_input(text: str) -> bool:
+    """
+    Call LlamaGuard to check if input is unsafe.
+    Returns True if content is UNSAFE and should be blocked.
+    """
+    import httpx
+
+    if not text:
+        return False
+
+    prompt = f"""<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+Task: Check if there is unsafe content in 'User' messages in conversations according to our safety policy with the below categories.
+
+<BEGIN UNSAFE CONTENT CATEGORIES>
+S1: Violent Crimes.
+S2: Non-Violent Crimes.
+S3: Sex Crimes.
+S4: Child Exploitation.
+S5: Defamation.
+S6: Specialized Advice.
+S7: Privacy.
+S8: Intellectual Property.
+S9: Indiscriminate Weapons.
+S10: Hate.
+S11: Self-Harm.
+S12: Sexual Content.
+S13: Elections.
+S14: Code Interpreter Abuse.
+<END UNSAFE CONTENT CATEGORIES>
+
+<BEGIN CONVERSATION>
+
+User: {text}
+
+<END CONVERSATION>
+
+Provide your safety assessment for ONLY THE LAST User message in the above conversation:
+- First line must read 'safe' or 'unsafe'.
+- If unsafe, a second line must include a comma-separated list of violated categories.<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{LLAMA_GUARD_BASE_URL}/completions",
+                json={
+                    "model": LLAMA_GUARD_MODEL,
+                    "prompt": prompt,
+                    "max_tokens": 50,
+                    "temperature": 0.0,
+                },
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+            result = response.json()
+            generated_text = result.get("choices", [{}])[0].get("text", "").strip().lower()
+
+            log.info(f"LlamaGuard input check: '{text[:50]}...' -> {generated_text[:50]}")
+
+            if "unsafe" in generated_text:
+                log.warning(f"LlamaGuard blocked input: {text[:100]}...")
+                return True
+            return False
+
+    except Exception as e:
+        log.error(f"Error calling LlamaGuard for input: {e}")
+        return False
+
+
+@action(name="call_llama_guard_output")
+async def call_llama_guard_output(text: str) -> bool:
+    """
+    Call LlamaGuard to check if output is unsafe.
+    Returns True if content is UNSAFE and should be blocked.
+    """
+    import httpx
+
+    if not text:
+        return False
+
+    prompt = f"""<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+Task: Check if there is unsafe content in 'Agent' messages in conversations according to our safety policy with the below categories.
+
+<BEGIN UNSAFE CONTENT CATEGORIES>
+S1: Violent Crimes.
+S2: Non-Violent Crimes.
+S3: Sex Crimes.
+S4: Child Exploitation.
+S5: Defamation.
+S6: Specialized Advice.
+S7: Privacy.
+S8: Intellectual Property.
+S9: Indiscriminate Weapons.
+S10: Hate.
+S11: Self-Harm.
+S12: Sexual Content.
+S13: Elections.
+S14: Code Interpreter Abuse.
+<END UNSAFE CONTENT CATEGORIES>
+
+<BEGIN CONVERSATION>
+
+Agent: {text}
+
+<END CONVERSATION>
+
+Provide your safety assessment for ONLY THE LAST Agent message in the above conversation:
+- First line must read 'safe' or 'unsafe'.
+- If unsafe, a second line must include a comma-separated list of violated categories.<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{LLAMA_GUARD_BASE_URL}/completions",
+                json={
+                    "model": LLAMA_GUARD_MODEL,
+                    "prompt": prompt,
+                    "max_tokens": 50,
+                    "temperature": 0.0,
+                },
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+            result = response.json()
+            generated_text = result.get("choices", [{}])[0].get("text", "").strip().lower()
+
+            log.info(f"LlamaGuard output check: '{text[:50]}...' -> {generated_text[:50]}")
+
+            if "unsafe" in generated_text:
+                log.warning(f"LlamaGuard blocked output: {text[:100]}...")
+                return True
+            return False
+
+    except Exception as e:
+        log.error(f"Error calling LlamaGuard for output: {e}")
+        return False
+
+
+@action(name="llama_guard_check_input")
+async def llama_guard_check_input(text: str, llm=None, config=None) -> bool:
+    """
+    Check input text using Llama Guard model.
+    Returns True if content is UNSAFE and should be blocked.
+    """
+    if not text:
+        return False
+
+    try:
+        # Use the llama_guard model from config
+        if llm is None:
+            log.warning("LLM not provided for Llama Guard check, skipping")
+            return False
+
+        # Llama Guard prompt format
+        prompt = f"""<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+Task: Check if there is unsafe content in 'User' messages in conversations according to our safety policy.
+
+<BEGIN CONVERSATION>
+
+User: {text}
+
+<END CONVERSATION>
+
+Provide your safety assessment for the user message.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+
+        # Call the Llama Guard model
+        response = await llm.generate_async(prompt=prompt)
+
+        if response:
+            response_lower = response.lower().strip()
+            # Llama Guard returns "safe" or "unsafe"
+            if "unsafe" in response_lower:
+                log.warning(f"Llama Guard detected unsafe input: {text[:100]}...")
+                return True
+
+        return False
+
+    except Exception as e:
+        log.error(f"Error in Llama Guard input check: {e}")
+        return False
+
+
+@action(name="llama_guard_check_output")
+async def llama_guard_check_output(text: str, llm=None, config=None) -> bool:
+    """
+    Check output text using Llama Guard model.
+    Returns True if content is UNSAFE and should be blocked.
+    """
+    if not text:
+        return False
+
+    try:
+        if llm is None:
+            log.warning("LLM not provided for Llama Guard check, skipping")
+            return False
+
+        # Llama Guard prompt format for output
+        prompt = f"""<|begin_of_text|><|start_header_id|>user<|end_header_id|>
+
+Task: Check if there is unsafe content in 'Agent' messages in conversations according to our safety policy.
+
+<BEGIN CONVERSATION>
+
+Agent: {text}
+
+<END CONVERSATION>
+
+Provide your safety assessment for the agent message.
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+
+        response = await llm.generate_async(prompt=prompt)
+
+        if response:
+            response_lower = response.lower().strip()
+            if "unsafe" in response_lower:
+                log.warning(f"Llama Guard detected unsafe output: {text[:100]}...")
+                return True
+
+        return False
+
+    except Exception as e:
+        log.error(f"Error in Llama Guard output check: {e}")
+        return False
+
+
 @action(name="classify_intent_regex")
 async def classify_intent_regex(text: str) -> Optional[str]:
     """

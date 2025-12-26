@@ -2,33 +2,51 @@
 # Mimicking SafeGuard Rails Flow
 
 # =============================================================================
-# Input Rails
+# Input Rails (matching SafeGuard input_rails)
 # =============================================================================
 
+# 1. AMD sensitive info block (regex)
 define flow check amd sensitive info input
     $result = execute check_amd_regex(text=$user_message, check_type="input")
     if $result
         bot say "I cannot provide information about AMD micro-architecture details."
         stop
 
+# 2. Harmful content regex (matching SafeGuard input_harmful_regex)
 define flow check harmful regex input
     $result = execute check_harmful_regex(text=$user_message)
     if $result
         bot say "I cannot assist with that request as it may involve harmful content."
         stop
 
+# 3. Llama Guard semantic safety check (LLM-based)
+define flow llama guard check input
+    $result = execute call_llama_guard_input(text=$user_message)
+    if $result
+        bot say "I cannot assist with that request as it violates safety guidelines."
+        stop
+
 # =============================================================================
-# Output Rails
+# Output Rails (matching SafeGuard output_rails)
 # =============================================================================
 
+# 1. AMD output protection (regex)
 define flow check amd sensitive info output
     $result = execute check_amd_regex(text=$bot_message, check_type="output")
     if $result
         bot refuse to respond
         stop
 
+# 2. Sensitive content regex (matching SafeGuard output_sensitive_regex)
 define flow check sensitive regex output
     $result = execute check_sensitive_regex(text=$bot_message)
+    if $result
+        bot refuse to respond
+        stop
+
+# 3. Llama Guard semantic safety check for output (LLM-based)
+define flow llama guard check output
+    $result = execute call_llama_guard_output(text=$bot_message)
     if $result
         bot refuse to respond
         stop
@@ -52,6 +70,20 @@ define user greet
     "hi"
     "hey"
 
-define flow
+define flow greeting
     user greet
     bot greet
+
+# =============================================================================
+# Fallback Flow - Pass to LLM for all other queries
+# =============================================================================
+
+define user ask general question
+    "..."
+
+define bot respond
+    "..."
+
+define flow general conversation
+    user ask general question
+    bot respond

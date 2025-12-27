@@ -51,6 +51,20 @@ define flow llama guard check output
         bot refuse to respond
         stop
 
+# 4. RAG Faithfulness check - verify response is grounded in retrieved context
+define flow check rag faithfulness
+    $result = execute check_rag_faithfulness_llama(response=$bot_message, context=$retrieved_docs)
+    if not $result
+        bot say "I cannot verify that response against the provided context."
+        stop
+
+# 5. Self-consistency check for hallucination detection
+define flow check self consistency
+    $result = execute check_self_consistency(prompt=$user_message, num_samples=3)
+    if not $result
+        bot say "I cannot provide a confident answer to that question as my responses were inconsistent."
+        stop
+
 # =============================================================================
 # Bot Messages
 # =============================================================================

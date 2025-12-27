@@ -378,6 +378,254 @@ Provide your safety assessment for the agent message.
         return False
 
 
+# =============================================================================
+# RAG Faithfulness Check Action
+# =============================================================================
+
+# Main LLM endpoint configuration (Qwen)
+MAIN_LLM_BASE_URL = "http://localhost:8000/v1"
+MAIN_LLM_MODEL = "Qwen/Qwen3-1.7B"
+
+
+@action(name="check_rag_faithfulness_llama")
+async def check_rag_faithfulness_llama(response: str, context: str = None) -> bool:
+    """
+    Check if the response is grounded/faithful to the context.
+    Uses Qwen LLM for faithfulness checking (LlamaGuard is for safety, not grounding).
+    This action is registered with NeMo Guardrails and calls Qwen via the configured endpoint.
+
+    Args:
+        response: The bot's response to verify
+        context: The retrieved documents/evidence (can be string or list)
+
+    Returns:
+        True if the response IS faithful (grounded in context)
+        False if the response is NOT faithful (hallucination)
+    """
+    import httpx
+    import re
+
+    if not response:
+        return True
+
+    # Handle context being None, string, or list
+    if context is None:
+        return True  # No context to check against
+
+    if isinstance(context, list):
+        evidence_text = "\n".join(str(doc) for doc in context if doc)
+    else:
+        evidence_text = str(context)
+
+    if not evidence_text.strip():
+        return True  # No evidence to check against
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Use Qwen (main LLM) for faithfulness checking via chat completions
+            qwen_response = await client.post(
+                f"{MAIN_LLM_BASE_URL}/chat/completions",
+                json={
+                    "model": MAIN_LLM_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a fact-checking assistant. Your job is to verify if an answer is supported by given evidence. After analysis, answer with exactly YES or NO."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Evidence: {evidence_text}\n\nAnswer to verify: {response}\n\nIs this answer supported by the evidence? Answer YES if the main claim can be found in the evidence, NO if it contradicts or contains information not in the evidence. End with your final answer: YES or NO"
+                        }
+                    ],
+                    "max_tokens": 200,
+                    "temperature": 0.0,
+                },
+                headers={"Content-Type": "application/json"},
+            )
+            qwen_response.raise_for_status()
+            result = qwen_response.json()
+            generated_text = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+            # Remove thinking tags if present
+            clean_text = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL | re.IGNORECASE)
+            clean_text = clean_text.strip().upper()
+
+            log.info(f"RAG faithfulness (Qwen via NeMo): '{response[:40]}...' -> '{clean_text[:30]}'")
+
+            # Check for YES/NO
+            if "YES" in clean_text and "NO" not in clean_text:
+                return True
+            elif "NO" in clean_text:
+                log.warning(f"Detected unfaithful response: {response[:100]}...")
+                return False
+
+            # If both or neither, check last word
+            words = clean_text.split()
+            if words:
+                last_word = words[-1].strip('.,!?')
+                if last_word == "YES":
+                    return True
+            return False
+
+    except Exception as e:
+        log.error(f"Error in RAG faithfulness check: {e}")
+        return True  # Default to faithful on error
+
+
+@action(name="check_rag_faithfulness")
+async def check_rag_faithfulness(answer: str, evidence: str) -> bool:
+    """
+    Check if the answer is grounded/faithful to the evidence.
+    Returns True if the answer IS faithful (grounded in evidence).
+    Returns False if the answer is NOT faithful (hallucination).
+    """
+    import httpx
+
+    if not answer or not evidence:
+        return True  # Default to faithful if missing data
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Use chat completions API - increase max_tokens to get past thinking
+            response = await client.post(
+                f"{MAIN_LLM_BASE_URL}/chat/completions",
+                json={
+                    "model": MAIN_LLM_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are a fact-checking assistant. After your analysis, your final answer must be exactly YES or NO on its own line."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Evidence: {evidence}\n\nAnswer to verify: {answer}\n\nIs this answer supported by the evidence? Answer YES if the main claim can be found in the evidence, NO if it contradicts or is not in the evidence. End with your final answer: YES or NO"
+                        }
+                    ],
+                    "max_tokens": 200,  # Allow room for thinking + answer
+                    "temperature": 0.0,
+                },
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+            result = response.json()
+            generated_text = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+            # Parse response: look for YES or NO, ignoring <think> blocks
+            # Remove thinking tags if present
+            import re
+            clean_text = re.sub(r'<think>.*?</think>', '', generated_text, flags=re.DOTALL | re.IGNORECASE)
+            clean_text = clean_text.strip().upper()
+
+            log.info(f"RAG faithfulness: '{answer[:40]}...' -> raw='{generated_text[:60]}...' clean='{clean_text[:30]}'")
+
+            # Check for YES/NO in the cleaned response
+            # Look for explicit YES or NO
+            if "YES" in clean_text and "NO" not in clean_text:
+                return True
+            elif "NO" in clean_text:
+                return False
+            # If both or neither, check the last word
+            words = clean_text.split()
+            if words:
+                last_word = words[-1].strip('.,!?')
+                if last_word == "YES":
+                    return True
+            return False
+
+    except Exception as e:
+        log.error(f"Error checking RAG faithfulness: {e}")
+        return True  # Default to faithful on error
+
+
+@action(name="check_self_consistency")
+async def check_self_consistency(prompt: str, num_samples: int = 3) -> bool:
+    """
+    Check for hallucination using self-consistency.
+    Generates multiple responses and checks if they are consistent.
+    Inconsistent responses indicate potential hallucination.
+
+    Args:
+        prompt: The user prompt to check
+        num_samples: Number of responses to generate for consistency check
+
+    Returns:
+        True if responses are consistent (likely factual, no hallucination)
+        False if responses are inconsistent (potential hallucination detected)
+    """
+    import httpx
+
+    if not prompt:
+        return True
+
+    # Deflection keywords indicate the model is properly refusing to answer
+    deflection_keywords = [
+        "i cannot", "i don't have", "unable to", "does not exist",
+        "false premise", "not a real", "fictional", "no evidence",
+        "i'm not sure", "i don't know", "cannot verify", "no information",
+        "doesn't exist", "isn't real", "not aware of", "no such"
+    ]
+
+    try:
+        responses = []
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Generate multiple responses with temperature variation
+            for i in range(num_samples):
+                response = await client.post(
+                    f"{MAIN_LLM_BASE_URL}/chat/completions",
+                    json={
+                        "model": MAIN_LLM_MODEL,
+                        "messages": [
+                            {"role": "system", "content": "You are a helpful and honest assistant. If you don't know something or if a question is based on false premises, say so clearly."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "max_tokens": 150,
+                        "temperature": 0.7,  # Variation to test consistency
+                    },
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+                result = response.json()
+                text = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+
+                # Clean thinking tags
+                text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE).strip()
+                responses.append(text.lower())
+
+        # Count how many responses deflect (refuse to answer)
+        deflection_count = sum(
+            1 for r in responses
+            if any(kw in r for kw in deflection_keywords)
+        )
+
+        # If majority deflect, model is properly refusing - no hallucination
+        if deflection_count >= (num_samples // 2 + 1):
+            log.info(f"Self-consistency: Majority deflected ({deflection_count}/{num_samples}) - consistent refusal")
+            return True
+
+        # Extract numbers from responses to check for numerical consistency
+        def extract_numbers(text):
+            return set(re.findall(r'\b\d+(?:\.\d+)?\b', text))
+
+        all_numbers = [extract_numbers(r) for r in responses]
+
+        # Check if responses give contradictory key numbers
+        if len(all_numbers) >= 2:
+            first_nums = all_numbers[0]
+            for nums in all_numbers[1:]:
+                # If both have numbers but they're significantly different
+                if first_nums and nums and first_nums != nums:
+                    log.warning(f"Self-consistency: Inconsistent numbers detected - potential hallucination")
+                    log.warning(f"  Response numbers: {[list(n) for n in all_numbers]}")
+                    return False
+
+        log.info(f"Self-consistency: Responses appear consistent")
+        return True
+
+    except Exception as e:
+        log.error(f"Error in self-consistency check: {e}")
+        return True  # Default to consistent on error
+
+
 @action(name="classify_intent_regex")
 async def classify_intent_regex(text: str) -> Optional[str]:
     """

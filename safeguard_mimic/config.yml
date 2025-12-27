@@ -55,6 +55,8 @@ rails:
       - check sensitive regex output
       # 3. Llama Guard semantic safety check (LLM-based)
       - llama guard check output
+      # 4. RAG Faithfulness check (LlamaGuard-based)
+      - check rag faithfulness
 
 # =============================================================================
 # Instructions
